@@ -7,10 +7,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 contract Crowdfunding is ReentrancyGuard {
     address public owner;
     IERC20 public acceptedToken =
-        IERC20(0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846);
+        IERC20(0x7DC2A27B35d7b4e1faD20dAd8c844443C65462DE);
     uint256 public fundTarget = 10 ether;
-    uint256 public startTime = 1705070688;
-    uint256 public endTime = 1705090688;
+    uint256 public startTime = 1705240800;
+    uint256 public endTime = 1705327200;
 
     mapping(address => uint256) public contributions;
 
@@ -23,7 +23,7 @@ contract Crowdfunding is ReentrancyGuard {
     }
 
     modifier isValidToken(IERC20 _token) {
-        require(_token == acceptedToken, "Invalid token");
+        require(_token == acceptedToken, "Only accepted token allowed");
         _;
     }
 
@@ -71,35 +71,32 @@ contract Crowdfunding is ReentrancyGuard {
         hasNotReachedTarget
         nonReentrant
     {
-        require(amount > 0, "Invalid contribution amount");
-
-        uint256 remainingTarget = fundTarget - getTotalContributions();
-        uint256 contributionAmount = amount;
-
-        if (amount > remainingTarget) {
-            contributionAmount = remainingTarget;
+        if (getTotalContributions() >= fundTarget) {
+            revert("Funding target reached");
         }
 
+        require(amount > 0, "Invalid contribution amount");
+
+        uint256 remainingUntilTarget = fundTarget - getTotalContributions();
+        uint256 userContribution = amount;
+        uint256 differenceToBeRefunded;
+
         require(
-            acceptedToken.transferFrom(
-                msg.sender,
-                address(this),
-                contributionAmount
-            ),
+            _token.transferFrom(msg.sender, address(this), userContribution),
             "Token transfer failed"
         );
 
-        contributions[msg.sender] += contributionAmount;
+        if (userContribution > remainingUntilTarget) {
+            differenceToBeRefunded = userContribution - remainingUntilTarget;
+        }
 
-        emit Contribution(msg.sender, contributionAmount);
+        contributions[msg.sender] += userContribution;
 
-        // Refund the excess amount
-        uint256 excessAmount = amount - contributionAmount;
-        if (excessAmount > 0) {
-            require(
-                acceptedToken.transfer(msg.sender, excessAmount),
-                "Token transfer failed"
-            );
+        emit Contribution(msg.sender, userContribution);
+
+        if (differenceToBeRefunded > 0) {
+            _token.transfer(msg.sender, differenceToBeRefunded);
+            contributions[msg.sender] -= differenceToBeRefunded;
         }
     }
 
@@ -107,35 +104,27 @@ contract Crowdfunding is ReentrancyGuard {
         return acceptedToken.balanceOf(address(this));
     }
 
-    function claimRefund() external isValidPhase {
+    function claimRefund() external nonReentrant hasNotReachedTarget {
         require(
             block.timestamp > endTime && getTotalContributions() < fundTarget,
-            "Cannot claim refund now"
+            "Either it's not the end of funding, or the fund target has been reached and deploy comes next"
         );
 
         uint256 refundAmount = contributions[msg.sender];
         require(refundAmount > 0, "No refund available");
 
-        // Ensure that the requested refund amount does not exceed the user's contribution
-        require(
-            refundAmount <= contributions[msg.sender],
-            "Invalid refund amount"
-        );
-
-        // Transfer Tokens to User
         require(
             acceptedToken.transfer(msg.sender, refundAmount),
             "Token transfer failed"
         );
 
-        // Update User's Contribution to Zero after a successful transfer
         contributions[msg.sender] = 0;
     }
 
-    function withdrawFunds() external onlyOwner isValidPhase nonReentrant {
+    function withdrawFunds() external onlyOwner {
         require(
             block.timestamp > endTime && getTotalContributions() >= fundTarget,
-            "Cannot withdraw funds now"
+            "Either it's not the end of funding, or the fund target hasn't been reached."
         );
 
         uint256 balance = getTotalContributions();
