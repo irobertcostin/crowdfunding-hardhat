@@ -11,6 +11,8 @@ const CMC_KEY = process.env.CMC_KEY;
 const SNOWTRACE_KEY = process.env.SNOWTRACE_KEY;
 
 
+
+
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: "0.8.21",
@@ -37,7 +39,7 @@ module.exports = {
 
   etherscan: {
     apiKey: {
-      avalanche: SNOWTRACE_KEY
+      avalancheFujiTestnet: SNOWTRACE_KEY
     }
   },
 

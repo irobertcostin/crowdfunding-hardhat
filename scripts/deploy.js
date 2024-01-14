@@ -25,15 +25,10 @@ async function main() {
   const deployoor = contractAddress.deploymentTransaction();
   console.log(`Contract deployer is: ${deployoor.from}`);
 
-  // fuji testnet verify may not work, so do:
-  // npx hardhat verify --network fuji *contractAddress*
-  if (network.config.chainId === 43114 && process.env.SNOWTRACE_KEY) {
-    await Crowdfunding.waitForDeployment(6)
-    await verify(contractAddress, []);
-  }
-
-
 }
+
+
+
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
